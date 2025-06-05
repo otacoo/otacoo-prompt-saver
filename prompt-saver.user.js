@@ -4,7 +4,8 @@
 // @version      1.0
 // @description  Floating panel for saving and viewing texts on 127.0.0.1
 // @author       otacoo
-// @match        *://127.0.0.1:*
+// @license      GPLv3; https://github.com/otacoo/prompt-saver/blob/main/LICENSE 
+// @match        *://127.0.0.1:*/
 // @grant        GM.setValue
 // @grant        GM.getValue
 // @grant        GM.listValues
