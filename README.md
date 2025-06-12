@@ -1,10 +1,10 @@
-# Prompt Saver Floating Panel
+# Otacoo Prompt Saver
 
 A small userscript that adds a floating panel to quickly save, view, and manage prompts and artist names on `localhost`.
 
 ## Features
 
-- **Floating Panel UI:** Easily accessible, non-intrusive panel that appears when you move your mouse to the top-right corner.
+- **Floating Panel UI:** Easily accessible, non-intrusive panel that appears when you move your mouse to the **top-right corner**.
 - **Tabbed Interface:** Switch between inputing text, your saved prompts, and artists tabs.
 - **Quick Copy:** Dedicated button to copy the positive prompt from A111/Forge WebUIs.
 - **Theme Support:** Light, dark, and system theme modes with a toggle button.
