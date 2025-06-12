@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Floating Prompt Saver
 // @namespace    prompt-saver
-// @version      1.0
+// @version      1.0.5
 // @description  Floating panel for saving and viewing texts on 127.0.0.1
 // @author       otacoo
 // @license      GPLv3; https://github.com/otacoo/prompt-saver/blob/main/LICENSE 
@@ -287,6 +287,25 @@
     #ps-artists-area .ps-delete-btn:hover {
         background: #ffeaea;
     }
+    .ps-search-bar {
+        width: 70%;
+        margin-bottom: 6px;
+        margin-top: 2px;
+        margin-left: 0;
+        margin-right: 0;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--ps-border);
+        font-size: 13px;
+        background: var(--ps-bg);
+        color: var(--ps-fg);
+        box-sizing: border-box;
+        outline: none;
+        transition: border 0.2s;
+    }
+    .ps-search-bar:focus {
+        border: 1.5px solid #1976d2;
+    }
     `;
     document.head.appendChild(style);
 
@@ -313,9 +332,11 @@
           <button id="ps-clear-btn" title="Clear the text area">Clear</button>
         </div>
         <div id="ps-list-area" style="display:none">
+          <input id="ps-list-search" class="ps-search-bar" type="text" placeholder="Search prompts..." />
           <ul></ul>
         </div>
         <div id="ps-artists-area" style="display:none">
+          <input id="ps-artists-search" class="ps-search-bar" type="text" placeholder="Search artists..." />
           <ul></ul>
         </div>
       </div>
@@ -324,29 +345,42 @@
 
     // --- Theme logic ---
     const themeBtn = panel.querySelector('#ps-theme-btn');
-    async function getTheme() {
-        // Prefer GM storage, fallback to attribute
-        return (await GM.getValue('ps_theme', null)) || document.documentElement.getAttribute('data-ps-theme');
-    }
+
     async function setTheme(theme) {
-        if (theme) {
-            document.documentElement.setAttribute('data-ps-theme', theme);
-            await GM.setValue('ps_theme', theme);
+        if (theme === 'dark') {
+            document.documentElement.setAttribute('data-ps-theme', 'dark');
+            themeBtn.textContent = '☀️';
+            await GM.setValue('ps_theme', 'dark');
         } else {
-            document.documentElement.removeAttribute('data-ps-theme');
-            await GM.setValue('ps_theme', '');
+            document.documentElement.setAttribute('data-ps-theme', 'light');
+            themeBtn.textContent = '🌙';
+            await GM.setValue('ps_theme', 'light');
         }
-        const isDark = (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches));
-        themeBtn.textContent = isDark ? '☀️' : '🌙';
     }
+
+    async function applyInitialTheme() {
+        const stored = await GM.getValue('ps_theme', null);
+        if (stored === 'dark' || stored === 'light') {
+            await setTheme(stored);
+        } else {
+            // Use system theme only on first load
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            await setTheme(prefersDark ? 'dark' : 'light');
+        }
+    }
+
     themeBtn.addEventListener('click', async () => {
-        const current = await GM.getValue('ps_theme', null);
-        if (current === 'dark') await setTheme('light');
-        else if (current === 'light') await setTheme(null); // system
-        else await setTheme('dark');
+        // Toggle between dark and light only
+        const current = document.documentElement.getAttribute('data-ps-theme');
+        if (current === 'dark') {
+            await setTheme('light');
+        } else {
+            await setTheme('dark');
+        }
     });
-    // On load, apply saved theme
-    (async () => { await setTheme(await GM.getValue('ps_theme', null)); })();
+
+    // On load, apply initial theme
+    applyInitialTheme();
 
     // --- Show/hide logic ---
     let panelVisible = false;
@@ -384,7 +418,7 @@
         }, 4000); // 4 seconds to hide
     }
     // Hide panel if clicking outside
-    document.addEventListener('mousedown', function(e) {
+    document.addEventListener('mousedown', function (e) {
         if (panelVisible && !panel.contains(e.target)) {
             hidePanelImmediately();
         }
@@ -567,12 +601,74 @@
         autoResizeTextarea();
     });
 
+    // --- Sphinx-like search parser ---
+    function parseSearchQuery(query) {
+        const orGroups = query.split(/\s*\|\s*/).map(group => {
+            const terms = [];
+            group.replace(/"([^"]+)"|\S+/g, (m, quoted) => {
+                if (quoted) {
+                    terms.push({ value: quoted, exact: true, not: false });
+                } else if (m.startsWith('-')) {
+                    const val = m.slice(1);
+                    if (val.startsWith('"') && val.endsWith('"')) {
+                        terms.push({ value: val.slice(1, -1), exact: true, not: true });
+                    } else {
+                        terms.push({ value: val, exact: false, not: true });
+                    }
+                } else {
+                    terms.push({ value: m, exact: false, not: false });
+                }
+            });
+            return terms;
+        });
+        return orGroups;
+    }
+    function matchesQuery(text, query) {
+        if (!query.trim()) return true;
+        const orGroups = parseSearchQuery(query);
+        return orGroups.some(andTerms => {
+            return andTerms.every(term => {
+                if (term.not) {
+                    if (term.exact) {
+                        return !text.includes(term.value);
+                    } else {
+                        return !text.toLowerCase().includes(term.value.toLowerCase());
+                    }
+                } else if (term.exact) {
+                    return text.includes(term.value);
+                } else {
+                    return text.toLowerCase().includes(term.value.toLowerCase());
+                }
+            });
+        });
+    }
+
+    // --- Search state ---
+    let psListSearchValue = '';
+    let psArtistsSearchValue = '';
+    const psListSearchInput = () => panel.querySelector('#ps-list-search');
+    const psArtistsSearchInput = () => panel.querySelector('#ps-artists-search');
+
+    if (psListSearchInput()) {
+        psListSearchInput().addEventListener('input', e => {
+            psListSearchValue = e.target.value;
+            renderList();
+        });
+    }
+    if (psArtistsSearchInput()) {
+        psArtistsSearchInput().addEventListener('input', e => {
+            psArtistsSearchValue = e.target.value;
+            renderArtistsList();
+        });
+    }
+
     // --- Render list ---
     async function renderList() {
         const ul = panel.querySelector('#ps-list-area ul');
         ul.innerHTML = '';
         const arr = await getTexts();
         arr.forEach((item, idx) => {
+            if (!matchesQuery(item.text, psListSearchValue)) return;
             const li = document.createElement('li');
             // Text content
             const span = document.createElement('span');
@@ -613,6 +709,7 @@
         ul.innerHTML = '';
         const arr = await getArtists();
         arr.forEach((item, idx) => {
+            if (!matchesQuery(item.text, psArtistsSearchValue)) return;
             const li = document.createElement('li');
             // Text content
             const span = document.createElement('span');
