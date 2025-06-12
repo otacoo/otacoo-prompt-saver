@@ -2,6 +2,8 @@
 
 A small userscript that adds a floating panel to quickly save, view, and manage prompts and artist names on `localhost`.
 
+### [Click to install](https://github.com/otacoo/otacoo-prompt-saver/raw/refs/heads/main/prompt-saver.user.js)
+
 ## Features
 
 - **Floating Panel UI:** Easily accessible, non-intrusive panel that appears when you move your mouse to the **top-right corner**.
@@ -15,7 +17,7 @@ A small userscript that adds a floating panel to quickly save, view, and manage 
 ## Installation
 
 1. Install a userscript manager like [Violentmonkey](https://violentmonkey.github.io/).
-2. Download or copy the contents of `prompt-saver.user.js`.
+2. [Download](https://github.com/otacoo/otacoo-prompt-saver/raw/refs/heads/main/prompt-saver.user.js) or copy the contents of `prompt-saver.user.js`.
 
 
 ## Compatibility
